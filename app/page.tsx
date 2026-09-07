@@ -98,65 +98,152 @@ function phraseFromCorpus(corpus: string, candidates: string[], fallback: string
   return candidates.find(c => lower.includes(c)) || fallback;
 }
 
+function hasAny(corpus: string, words: string[]) { return words.some(w => corpus.includes(w)); }
+
 function makeIdeaPack(refs: Video[], similarity: Similarity, useCase: string, visualStyle: string, sceneRule: string, aspectRatio: string): IdeaPack {
   const ranked = [...refs].sort((a,b) => viewsPerDay(b) - viewsPerDay(a));
-  const corpus = refs.map(v => `${v.title} ${v.description.slice(0,1200)} ${v.tags.join(" ")}`).join(" ");
+  const corpus = refs.map(v => `${v.title} ${v.description.slice(0,1600)} ${v.tags.join(" ")}`).join(" ");
+  const lower = corpus.toLowerCase();
   const allPhrases = refs.flatMap(v => [...tokenize(v.title), ...v.tags.flatMap(tokenize)]);
   const freq = new Map<string, number>(); allPhrases.forEach(k => freq.set(k, (freq.get(k) || 0) + 1));
-  const top = [...freq.entries()].sort((a,b)=>b[1]-a[1]).map(([k])=>k).slice(0,24);
+  const top = [...freq.entries()].sort((a,b)=>b[1]-a[1]).map(([k])=>k).slice(0,30);
 
-  const niche = phraseFromCorpus(corpus, NICHES, top.includes("lofi") ? "lofi" : "lofi beats");
-  const place = phraseFromCorpus(corpus, PLACES, top.includes("tokyo") ? "tokyo" : "city");
-  const time = phraseFromCorpus(corpus, TIMES, corpus.toLowerCase().includes("night") ? "night" : "late night");
-  const weather = phraseFromCorpus(corpus, WEATHER, corpus.toLowerCase().includes("rain") ? "after the rain" : "cloudy");
-  const mood = corpus.toLowerCase().includes("cozy") ? "cozy" : corpus.toLowerCase().includes("peaceful") ? "peaceful" : "calm";
-  const atmosphere = corpus.toLowerCase().includes("neon") ? "soft neon lights" : corpus.toLowerCase().includes("window") ? "quiet window ambience" : "soft city ambience";
+  // Semantic anchors are deliberately stronger than generic place/time fallbacks.
+  const babyAudience = hasAny(lower, ["baby","babies","infant","newborn","toddler"]);
+  const sleepIntent = hasAny(lower, ["sleep","asleep","insomnia","bedtime","nap","napping","deep sleep"]);
+  const lullabyCue = hasAny(lower, ["lullaby","lullabies","music box","nursery"]);
+  const rainSound = hasAny(lower, ["gentle rain","rain sounds","rain sound","rainfall","raining","rain"]);
+  const whiteNoise = hasAny(lower, ["white noise","brown noise","pink noise"]);
+  const meditation = hasAny(lower, ["meditation","meditate","mindfulness"]);
+  const study = hasAny(lower, ["study","studying","focus","coding","work"]);
+  const isBabySleep = babyAudience && (sleepIntent || lullabyCue);
+  const isSleepAudio = sleepIntent && !hasAny(lower, ["lofi","jazz","bossa nova"]);
 
-  const baseScenario = similarity === "fresh"
-    ? `${mood} ${time} above ${place}`
-    : similarity === "close"
-      ? `${weather} ${place} ${time}`
-      : `${place} ${weather} ${time}`;
-  const scenario = titleCase(baseScenario.replace(/\s+/g," "));
+  const detectedUseCase = isBabySleep || sleepIntent ? "Sleep" : meditation ? "Meditation" : study ? "Study & Focus" : "Relax";
+  const intent = useCase === "Auto" ? detectedUseCase : useCase;
+  const explicitPlace = PLACES.find(c => lower.includes(c));
+  const explicitTime = TIMES.find(c => lower.includes(c));
+  const explicitWeather = WEATHER.find(c => lower.includes(c));
+  const mood = lower.includes("peaceful") ? "peaceful" : lower.includes("soothing") ? "soothing" : lower.includes("gentle") ? "gentle" : lower.includes("cozy") ? "cozy" : lower.includes("calm") ? "calm" : "peaceful";
+
+  let niche = phraseFromCorpus(corpus, NICHES, top.includes("lofi") ? "lofi" : "relaxing music");
+  if (isBabySleep) niche = lullabyCue ? "baby lullaby" : "baby sleep music";
+  else if (isSleepAudio && rainSound) niche = "sleep music";
+  else if (whiteNoise) niche = "sleep sounds";
+
+  const soundElements = unique([
+    rainSound ? "gentle rain sounds" : "",
+    whiteNoise ? "soft white noise" : "",
+    lower.includes("piano") ? "soft piano" : "",
+    lower.includes("music box") ? "gentle music box" : "",
+    lower.includes("ocean") || lower.includes("waves") ? "ocean waves" : "",
+    lower.includes("thunder") ? "distant thunder" : ""
+  ].filter(Boolean));
+  const soundHook = soundElements[0] || (isBabySleep ? "soft soothing ambience" : "gentle ambient sound");
+
+  let atmosphere = lower.includes("stars") || lower.includes("starry") ? "soft starry night" : lower.includes("moon") ? "gentle moonlit ambience" : lower.includes("window") ? "quiet window ambience" : "peaceful night ambience";
+  let visualScenario: string;
+  let baseScenario: string;
+
+  if (isBabySleep) {
+    baseScenario = `${mood} baby bedtime with ${soundHook}`;
+    visualScenario = rainSound
+      ? "a peaceful baby nursery at night with a simple empty crib, soft moonlight, a rain-streaked window, gentle clouds and tiny warm night-light details"
+      : "a peaceful baby nursery at night with a simple empty crib, soft moonlight, subtle stars and a warm dim night-light";
+    atmosphere = rainSound ? "gentle rain and bedtime ambience" : "soft bedtime ambience";
+  } else if (isSleepAudio) {
+    baseScenario = `${mood} sleep atmosphere${rainSound ? " with gentle rain" : ""}`;
+    visualScenario = rainSound
+      ? "a quiet dark bedroom at night, soft rain outside the window, low warm bedside light, uncluttered restful composition"
+      : "a quiet dark bedroom at night, soft low lighting, uncluttered restful composition";
+    atmosphere = rainSound ? "gentle rain sleep ambience" : "quiet sleep ambience";
+  } else {
+    const place = explicitPlace || "calm setting";
+    const time = explicitTime || (lower.includes("night") ? "night" : "evening");
+    const weather = explicitWeather || (rainSound ? "rain" : "soft atmosphere");
+    baseScenario = similarity === "fresh" ? `${mood} ${time} ${place}` : `${weather} ${place} ${time}`;
+    visualScenario = `${mood} ${place} at ${time}, ${weather}`;
+  }
+
   const nicheTitle = titleCase(niche);
-  const intent = useCase || "Relax";
+  let mainTitle: string;
+  let alternatives: string[];
 
-  const mainTitle = safeSentence(`${scenario} ${nicheTitle} | ${titleCase(mood)} Beats for ${intent} + ${titleCase(atmosphere)}`);
-  const alternatives = unique([
-    `${titleCase(weather)} ${titleCase(place)} ${nicheTitle} 🌧️ | Soft Beats for ${intent} + ${titleCase(atmosphere)}`,
-    `${titleCase(time)} ${titleCase(place)} ${nicheTitle} 🌙 | ${titleCase(mood)} Beats for ${intent} + Quiet City Mood`,
-    `${titleCase(place)} ${titleCase(weather)} ${nicheTitle} | Gentle Beats for ${intent} + Warm Distant Lights`,
-    `${titleCase(mood)} ${titleCase(place)} ${nicheTitle} | Soft Music for ${intent} + ${titleCase(time)} Ambience`,
-    `${titleCase(time)} Escape in ${titleCase(place)} ${nicheTitle} | Calm Beats for ${intent} + After-Rain Atmosphere`
-  ]).filter(t => t !== mainTitle).slice(0,5);
+  if (isBabySleep) {
+    mainTitle = safeSentence(`Baby Sleep Music with ${titleCase(soundHook)} 🌙 | Soothing ${lullabyCue ? "Lullaby" : "Music"} for Deep Sleep & Bedtime`);
+    alternatives = unique([
+      `Gentle Rain Lullaby for Babies 🌧️ | Peaceful Sleep Music for Bedtime & Deep Sleep`,
+      `Baby Sleep Music 🌙 ${titleCase(soundHook)} for Falling Asleep Fast & Sleeping Peacefully`,
+      `Soothing Baby Lullaby with ${titleCase(soundHook)} | Calm Bedtime Music for Deep Sleep`,
+      `${titleCase(soundHook)} for Baby Sleep 😴 | Gentle Bedtime Music for a Peaceful Night`,
+      `Peaceful Baby Sleep Music | ${titleCase(soundHook)} + Soft Lullaby for Bedtime`
+    ]).filter(t => t !== mainTitle).slice(0,5);
+  } else if (isSleepAudio) {
+    mainTitle = safeSentence(`${rainSound ? "Gentle Rain" : "Peaceful Night"} Sleep Music 😴 | Calm Sounds for Deep Sleep & Insomnia Relief`);
+    alternatives = unique([
+      `Deep Sleep Music with ${titleCase(soundHook)} | Relax, Unwind & Fall Asleep Peacefully`,
+      `${titleCase(soundHook)} for Sleep 🌙 | Calm Night Music for Deep Rest`,
+      `Peaceful Sleep Sounds | ${titleCase(soundHook)} for Bedtime & Insomnia Relief`,
+      `Fall Asleep Peacefully 😴 | Gentle Sleep Music + ${titleCase(soundHook)}`,
+      `Calm Night Sleep Music | Soft ${titleCase(soundHook)} for Restful Sleep`
+    ]).filter(t => t !== mainTitle).slice(0,5);
+  } else {
+    const scenario = titleCase(baseScenario.replace(/\s+/g," "));
+    const intentLabel = intent === "Study & Focus" ? "Study & Focus" : intent;
+    mainTitle = safeSentence(`${scenario} ${nicheTitle} | ${titleCase(mood)} Music for ${intentLabel} + ${titleCase(atmosphere)}`);
+    alternatives = unique([
+      `${scenario} ${nicheTitle} | Gentle Music for ${intentLabel} + ${titleCase(atmosphere)}`,
+      `${titleCase(mood)} ${nicheTitle} | Soft Music for ${intentLabel} + ${titleCase(atmosphere)}`,
+      `${nicheTitle} for ${intentLabel} | ${scenario} + Peaceful Ambience`,
+      `${scenario} | ${titleCase(mood)} ${nicheTitle} for ${intentLabel}`,
+      `${titleCase(mood)} Escape ${nicheTitle} | Music for ${intentLabel} + ${titleCase(atmosphere)}`
+    ]).filter(t => t !== mainTitle).slice(0,5);
+  }
 
-  const referenceCue = similarity === "close" ? `preserve the reference pattern of ${weather}, ${place}, ${time}, and ${mood} atmosphere while changing layout, architecture, props, and camera composition` :
-    similarity === "balanced" ? `use the same emotional ingredients—${mood}, ${weather}, ${time}, ${place}—but create a clearly different location layout and visual storytelling` :
-    `reinterpret the reference mood in a new setting, using only subtle cues from ${place}, ${weather}, and ${time}`;
-  const noPeople = sceneRule === "no people" ? "no people, empty peaceful scene" : sceneRule;
-  const primaryPrompt = `${visualStyle}, ${baseScenario}, ${weather} atmosphere, ${atmosphere}, ${noPeople}, cinematic depth, strong foreground-midground-background separation, one clear primary subject, natural detailed environment, tasteful lighting, rule of thirds composition, clean thumbnail-friendly silhouette, no text, ${referenceCue}, original composition, aspect ratio ${aspectRatio}`;
-  const variationPrompt = `${visualStyle}, a new ${mood} scene inspired by ${place} at ${time}, ${weather}, ${noPeople}, different architecture and object placement from the reference, stronger visual hook in the foreground, subtle practical lights, atmospheric depth, uncluttered composition, cinematic wide frame, no text, aspect ratio ${aspectRatio}`;
-  const thumbPrompt = `${visualStyle}, YouTube music thumbnail, ${mood} ${place} ${time}, ${weather}, one unmistakable focal point, high visual contrast between warm subject lighting and cooler environment, simple composition with generous negative space, ${noPeople}, atmospheric depth, no text, original scene, aspect ratio ${aspectRatio}`;
+  const referenceCue = similarity === "close"
+    ? "keep the same core audience, use case, sound theme and emotional promise as the reference while changing the exact composition, props and wording"
+    : similarity === "balanced"
+      ? "preserve the reference's core audience, use case and sound theme, but create a clearly original scene, composition and wording"
+      : "keep only the strongest semantic anchors from the reference and reinterpret them in a fresh but still relevant visual direction";
+  const noPeople = sceneRule === "no people" ? "no people, peaceful empty scene" : sceneRule;
+  const primaryPrompt = `${visualStyle}, ${visualScenario}, ${noPeople}, ${mood} emotional tone, visual concept aligned with ${niche} and ${intent.toLowerCase()}, ${soundHook} represented visually through the environment, soft low-distraction lighting, one clear primary focal point, strong foreground-midground-background separation, clean thumbnail-friendly composition, rule of thirds, no text, ${referenceCue}, original composition, aspect ratio ${aspectRatio}`;
+  const variationPrompt = `${visualStyle}, alternative original scene for ${niche}, ${isBabySleep ? "baby bedtime and deep sleep" : intent.toLowerCase()}, ${soundHook}, ${mood} atmosphere, ${noPeople}, different camera angle and object placement, simple soothing environment, low visual distraction, atmospheric depth, no text, aspect ratio ${aspectRatio}`;
+  const thumbPrompt = `${visualStyle}, YouTube music thumbnail for ${niche}, strong visual hook communicating ${isBabySleep ? "baby bedtime, peaceful sleep" : intent.toLowerCase()}, ${soundHook}, ${mood} mood, ${noPeople}, one unmistakable focal subject, simple silhouette, clean negative space, high readability at mobile size, no text, original scene, aspect ratio ${aspectRatio}`;
 
-  const shortDescription = `Step into a ${mood} ${time} in ${place}, where ${weather} streets and ${atmosphere.toLowerCase()} create a quiet escape. This ${niche} mix is designed for ${intent.toLowerCase()}, with a visual atmosphere that feels familiar, immersive, and easy to stay with.`;
-  const longDescription = `${shortDescription}\n\nThe scene follows a peaceful visual journey through ${place}: ${weather} surroundings, soft practical lights, and a calm sense of depth that makes the environment feel lived-in without becoming distracting. The concept is inspired by patterns found in the selected reference videos, but the location layout, composition, props, and visual storytelling are intentionally reimagined as a new original scene.\n\nPlay this mix while you ${intent.toLowerCase()}, read, unwind, or simply want a quiet background atmosphere. Let the gentle ${niche} mood and ${time} ambience settle into the room.`;
+  const audiencePhrase = isBabySleep ? "babies and bedtime routines" : `${intent.toLowerCase()} sessions`;
+  const shortDescription = isBabySleep
+    ? `Create a peaceful bedtime atmosphere with soothing baby sleep music and ${soundHook}. The gentle soundscape is designed to help little ones settle down, relax, and drift into deeper sleep while the visual stays soft, calm, and low-distraction.`
+    : `Settle into a ${mood} atmosphere shaped around ${niche} and ${soundHook}. This concept is designed for ${audiencePhrase}, keeping the strongest theme from the reference while presenting it with an original visual direction.`;
+  const longDescription = `${shortDescription}\n\nThe visual concept uses ${visualScenario}, with soft lighting and a simple composition that supports the listening experience instead of competing with it. The strongest reference anchors—${isBabySleep ? "baby sleep, bedtime, soothing music" : niche}, ${soundHook}, and ${intent.toLowerCase()}—are intentionally preserved, while the exact layout, visual storytelling and wording remain original.\n\nUse this video during ${isBabySleep ? "bedtime, naps, or quiet nighttime routines" : intent.toLowerCase()}, or whenever a calm background atmosphere is needed. The goal is a familiar audience promise with a fresh execution.`;
 
   const coreTags = refs.flatMap(v => v.tags).map(t => t.toLowerCase().trim()).filter(Boolean);
+  const semanticTags = isBabySleep ? [
+    "baby sleep music","sleep music for babies","baby lullaby","gentle rain sounds","baby bedtime music","deep sleep for babies","soothing baby music","bedtime lullaby","calming music for babies","rain sounds for sleep"
+  ] : isSleepAudio ? [
+    "sleep music","deep sleep music","gentle rain sounds","rain sounds for sleep","insomnia relief","bedtime music","calm sleep sounds","relaxing sleep music"
+  ] : [
+    `${niche} for ${intent.toLowerCase()}`, `${mood} ${niche}`, `${soundHook}`, `${intent.toLowerCase()} music`
+  ];
   const metaKeywords = unique([
-    `${place} ${niche}`, `${weather} ${niche}`, `${time} ${niche}`, `${mood} ${niche}`,
-    `${niche} for ${intent.toLowerCase()}`, `${place} ${weather}`, `${time} ambience`, `${place} ambience`,
-    ...coreTags.sort((a,b) => a.length-b.length).filter(t => t.length <= 35).slice(0,16),
+    ...semanticTags,
+    ...coreTags.sort((a,b) => a.length-b.length).filter(t => t.length <= 45).slice(0,16),
     ...top.slice(0,10)
-  ]).filter(k => k.length >= 3 && k.length <= 45).slice(0,25);
+  ]).filter(k => k.length >= 3 && k.length <= 50).slice(0,25);
 
-  const hashtags = unique([
-    slugHashtag(`${place}${niche}`), slugHashtag(niche), slugHashtag(`${weather}${niche}`), slugHashtag(`${time}${niche}`),
-    slugHashtag(`${mood}${niche}`), slugHashtag(`${intent}music`), "#lofibeats", "#relaxmusic", "#studymusic", "#chillbeats",
-    ...metaKeywords.slice(0,10).map(slugHashtag)
-  ]).filter(h => h.length > 1).slice(0,15);
+  const hashtags = unique((isBabySleep ? [
+    "#BabySleepMusic","#BabyLullaby","#SleepMusicForBabies","#BedtimeMusic","#GentleRain","#RainSounds","#DeepSleep","#SoothingMusic","#BabySleep","#Lullaby"
+  ] : isSleepAudio ? [
+    "#SleepMusic","#DeepSleep","#RainSounds","#GentleRain","#InsomniaRelief","#BedtimeMusic","#RelaxingMusic","#SleepSounds"
+  ] : [
+    slugHashtag(niche), slugHashtag(`${mood}${niche}`), slugHashtag(`${intent}music`), ...metaKeywords.slice(0,10).map(slugHashtag)
+  ])).filter(h => h.length > 1).slice(0,15);
+
+  const anchors = isBabySleep
+    ? `Baby Sleep · ${rainSound ? "Gentle Rain" : "Bedtime"} · ${lullabyCue ? "Lullaby" : "Soothing Music"} · Deep Sleep`
+    : `${titleCase(niche)} · ${titleCase(soundHook)} · ${intent} · ${titleCase(mood)} mood`;
 
   return {
-    conceptSummary: `Reference pattern: ${ranked.length} video${ranked.length===1?"":"s"} · ${titleCase(niche)} · ${titleCase(place)} · ${titleCase(weather)} · ${titleCase(time)} · ${titleCase(mood)} mood. Similarity: ${titleCase(similarity)}.`,
+    conceptSummary: `Reference anchors: ${anchors}. Similarity: ${titleCase(similarity)}. ${useCase === "Auto" ? "Use case detected automatically from the selected reference." : `Use case override: ${intent}.`}`,
     mainTitle,
     alternativeTitles: alternatives,
     visualPrompts: [
@@ -183,7 +270,7 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [tab, setTab] = useState<Tab>("overview");
   const [similarity, setSimilarity] = useState<Similarity>("balanced");
-  const [useCase, setUseCase] = useState("Relax");
+  const [useCase, setUseCase] = useState("Auto");
   const [visualStyle, setVisualStyle] = useState("cinematic HD anime style");
   const [sceneRule, setSceneRule] = useState("no people");
   const [aspectRatio, setAspectRatio] = useState("16:9");
@@ -252,7 +339,7 @@ export default function Home() {
     {showPwaSplash&&<div className="pwaSplash" aria-hidden="true"><img src="/splash-screen.png" alt=""/></div>}
     <header className="topbar">
       <div className="brand"><img src="/tubescout-mark.png" alt="TubeScout"/><div><h1>TubeScout</h1><span>YouTube Competitor Research Tool</span></div></div>
-      <div className="topActions"><span className="versionPill">v1.2</span>{installPrompt&&<button className="installBtn" onClick={installApp}><Smartphone size={16}/> <span>Install App</span></button>}<button className="iconBtn" onClick={()=>setDark(v=>!v)} aria-label="Toggle theme">{dark?<Sun size={18}/>:<Moon size={18}/>}</button></div>
+      <div className="topActions"><span className="versionPill">v1.3</span>{installPrompt&&<button className="installBtn" onClick={installApp}><Smartphone size={16}/> <span>Install App</span></button>}<button className="iconBtn" onClick={()=>setDark(v=>!v)} aria-label="Toggle theme">{dark?<Sun size={18}/>:<Moon size={18}/>}</button></div>
     </header>
 
     <section className="hero">
@@ -294,7 +381,7 @@ export default function Home() {
         {tab==="create"&&<div className="tabPanel createWorkspace">
           <section className="createSetup"><div className="sectionHead"><div><h3>Scout to Create</h3><p>Turn 1–5 researched videos into a new original content direction.</p></div><WandSparkles size={19}/></div>
             <div className="referenceChips">{selectedRefs.length?selectedRefs.map(v=><div key={v.id}><img src={v.thumbnail} alt=""/><span>{v.title}</span><button onClick={()=>toggleReference(v.id)}><X size={14}/></button></div>):<div className="noRefs"><Lightbulb size={20}/><span>Select reference videos from the <button onClick={()=>setTab("videos")}>Videos</button> tab first.</span></div>}</div>
-            <div className="formGrid"><label><span>Similarity Level</span><select value={similarity} onChange={e=>setSimilarity(e.target.value as Similarity)}><option value="close">Close — familiar pattern</option><option value="balanced">Balanced — recommended</option><option value="fresh">Fresh — wider reinterpretation</option></select></label><label><span>Use Case</span><select value={useCase} onChange={e=>setUseCase(e.target.value)}><option>Study</option><option>Work</option><option>Relax</option><option>Focus</option><option>Sleep</option></select></label><label><span>Visual Style</span><select value={visualStyle} onChange={e=>setVisualStyle(e.target.value)}><option>cinematic HD anime style</option><option>Ghibli-inspired anime style</option><option>hyper realistic cinematic photography</option><option>cozy digital illustration</option><option>dark cinematic anime style</option></select></label><label><span>Scene Rule</span><select value={sceneRule} onChange={e=>setSceneRule(e.target.value)}><option value="no people">No people</option><option value="indoor scene, no people">Indoor only</option><option value="outdoor scene, no people">Outdoor only</option><option value="rainy atmosphere, no people">Rainy atmosphere</option><option value="after-rain atmosphere, no people">After rain</option></select></label><label><span>Aspect Ratio</span><select value={aspectRatio} onChange={e=>setAspectRatio(e.target.value)}><option>16:9</option><option>1:1</option><option>9:16</option></select></label></div>
+            <div className="formGrid"><label><span>Similarity Level</span><select value={similarity} onChange={e=>setSimilarity(e.target.value as Similarity)}><option value="close">Close — familiar pattern</option><option value="balanced">Balanced — recommended</option><option value="fresh">Fresh — wider reinterpretation</option></select></label><label><span>Use Case</span><select value={useCase} onChange={e=>setUseCase(e.target.value)}><option value="Auto">Auto from reference</option><option>Study</option><option>Work</option><option>Relax</option><option>Focus</option><option>Sleep</option><option>Meditation</option></select></label><label><span>Visual Style</span><select value={visualStyle} onChange={e=>setVisualStyle(e.target.value)}><option>cinematic HD anime style</option><option>Ghibli-inspired anime style</option><option>hyper realistic cinematic photography</option><option>cozy digital illustration</option><option>dark cinematic anime style</option></select></label><label><span>Scene Rule</span><select value={sceneRule} onChange={e=>setSceneRule(e.target.value)}><option value="no people">No people</option><option value="indoor scene, no people">Indoor only</option><option value="outdoor scene, no people">Outdoor only</option><option value="rainy atmosphere, no people">Rainy atmosphere</option><option value="after-rain atmosphere, no people">After rain</option></select></label><label><span>Aspect Ratio</span><select value={aspectRatio} onChange={e=>setAspectRatio(e.target.value)}><option>16:9</option><option>1:1</option><option>9:16</option></select></label></div>
             <button className="primary wideGenerate" onClick={generateIdea} disabled={!selectedRefs.length}><WandSparkles size={18}/> Generate Idea Pack</button>
             <div className="originalityNote"><Sparkles size={16}/><p>TubeScout extracts patterns, not copies. The generated direction intentionally changes composition, props and visual storytelling to help you create a distinct new video.</p></div>
           </section>
