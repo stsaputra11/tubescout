@@ -72,3 +72,10 @@ npm start
 - Node.js: 22.x or newer compatible version
 
 After adding or changing `YOUTUBE_API_KEY`, redeploy the project so the new deployment receives the environment variable.
+
+
+## v1.2 branding update
+- Red / black / white TubeScout theme.
+- Sticky header with TubeScout H1 and transparent binocular logo.
+- Logo mark is used for favicon and PWA icons.
+- Full TubeScout artwork is shown as the standalone PWA launch splash.

@@ -189,13 +189,20 @@ export default function Home() {
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [ideaPack, setIdeaPack] = useState<IdeaPack | null>(null);
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [showPwaSplash, setShowPwaSplash] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("tubescout-theme"); setDark(saved !== "light");
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
     const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e as BeforeInstallPromptEvent); };
     window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    let splashTimer: ReturnType<typeof setTimeout> | undefined;
+    if (standalone) {
+      setShowPwaSplash(true);
+      splashTimer = setTimeout(() => setShowPwaSplash(false), 1250);
+    }
+    return () => { window.removeEventListener("beforeinstallprompt", handler); if (splashTimer) clearTimeout(splashTimer); };
   }, []);
   useEffect(() => { document.documentElement.dataset.theme = dark ? "dark" : "light"; localStorage.setItem("tubescout-theme", dark ? "dark" : "light"); }, [dark]);
 
@@ -242,14 +249,15 @@ export default function Home() {
   function copyAll(){copyText(filtered.map(v=>`${v.title}\n${v.url}\nChannel: ${v.channelTitle}\nViews: ${v.views}\nViews/day: ${Math.round(viewsPerDay(v))}\nEngagement: ${engagementRate(v).toFixed(2)}%\nSEO score: ${seoAnalysis(v.title).score}/100\nTags: ${v.tags.join(", ")}\n\n${v.description}`).join("\n\n----------------\n\n"));setNotice("Metadata and analysis copied to clipboard.");}
 
   return <main className="shell">
+    {showPwaSplash&&<div className="pwaSplash" aria-hidden="true"><img src="/splash-screen.png" alt=""/></div>}
     <header className="topbar">
-      <div className="brand"><img src="/favicon-48.png" alt="TubeScout"/><div><strong>TubeScout</strong><span>YouTube Competitor Research Tool</span></div></div>
-      <div className="topActions"><span className="versionPill">v1.2</span>{installPrompt&&<button className="installBtn" onClick={installApp}><Smartphone size={16}/> Install App</button>}<button className="iconBtn" onClick={()=>setDark(v=>!v)} aria-label="Toggle theme">{dark?<Sun size={18}/>:<Moon size={18}/>}</button></div>
+      <div className="brand"><img src="/tubescout-mark.png" alt="TubeScout"/><div><h1>TubeScout</h1><span>YouTube Competitor Research Tool</span></div></div>
+      <div className="topActions"><span className="versionPill">v1.2</span>{installPrompt&&<button className="installBtn" onClick={installApp}><Smartphone size={16}/> <span>Install App</span></button>}<button className="iconBtn" onClick={()=>setDark(v=>!v)} aria-label="Toggle theme">{dark?<Sun size={18}/>:<Moon size={18}/>}</button></div>
     </header>
 
     <section className="hero">
       <div className="eyebrow"><Eye size={15}/> COMPETITOR INTELLIGENCE → CONTENT CREATION</div>
-      <div className="heroTitle"><img src="/tubescout-logo.png" alt="TubeScout logo"/><div><h1>Scout the pattern.<br/><em>Create your own angle.</em></h1><p>Research public YouTube metadata, discover repeatable competitor patterns, then turn selected references into an original title, visual concept, description, keywords and hashtags.</p></div></div>
+      <div className="heroTitle"><div><h2>Scout the pattern.<br/><em>Create your own angle.</em></h2><p>Research public YouTube metadata, discover repeatable competitor patterns, then turn selected references into an original title, visual concept, description, keywords and hashtags.</p></div></div>
     </section>
 
     <section className="inputCard">
