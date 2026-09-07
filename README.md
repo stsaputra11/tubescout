@@ -1,4 +1,4 @@
-# TubeScout v1.3
+# TubeScout v1.3.1
 
 **YouTube Competitor Research Tool**
 
@@ -17,7 +17,7 @@ TubeScout researches public YouTube video metadata and turns selected reference 
 - Competitor comparison
 - CSV / XLSX export
 
-### Scout to Create (v1.3)
+### Scout to Create (v1.3.1)
 Select 1–5 researched videos and generate locally in the browser:
 - 1 main title + 5 alternative titles
 - 3 image prompts: primary, variation and thumbnail
@@ -74,14 +74,14 @@ npm start
 After adding or changing `YOUTUBE_API_KEY`, redeploy the project so the new deployment receives the environment variable.
 
 
-## v1.3 branding update
+## v1.3.1 branding update
 - Red / black / white TubeScout theme.
 - Sticky header with TubeScout H1 and transparent binocular logo.
 - Logo mark is used for favicon and PWA icons.
 - Full TubeScout artwork is shown as the standalone PWA launch splash.
 
 
-## v1.3 changes
+## v1.3.1 changes
 - Full-width sticky header with aligned inner branding.
 - Success alerts use green; errors/warnings use amber.
 - Scout to Create uses semantic anchors and Auto from reference intent detection.
