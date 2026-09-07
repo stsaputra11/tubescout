@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity, BarChart3, Check, Copy, Download, ExternalLink, Eye, FileSpreadsheet,
   Gauge, Hash, Image as ImageIcon, Layers3, Lightbulb, Moon, Search, Sparkles,
-  Sun, Trash2, TrendingUp, Users, WandSparkles, Youtube, X, Smartphone, FileText
+  Sun, Trash2, TrendingUp, Users, WandSparkles, Youtube, X, FileText
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -30,11 +30,6 @@ type IdeaPack = {
   metaKeywords: string[];
   hashtags: string[];
 };
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-}
 
 const fmt = new Intl.NumberFormat("en-US");
 const pct = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
@@ -275,21 +270,18 @@ export default function Home() {
   const [sceneRule, setSceneRule] = useState("no people");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [ideaPack, setIdeaPack] = useState<IdeaPack | null>(null);
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPwaSplash, setShowPwaSplash] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("tubescout-theme"); setDark(saved !== "light");
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-    const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e as BeforeInstallPromptEvent); };
-    window.addEventListener("beforeinstallprompt", handler);
     const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
     let splashTimer: ReturnType<typeof setTimeout> | undefined;
     if (standalone) {
       setShowPwaSplash(true);
       splashTimer = setTimeout(() => setShowPwaSplash(false), 1250);
     }
-    return () => { window.removeEventListener("beforeinstallprompt", handler); if (splashTimer) clearTimeout(splashTimer); };
+    return () => { if (splashTimer) clearTimeout(splashTimer); };
   }, []);
   useEffect(() => { document.documentElement.dataset.theme = dark ? "dark" : "light"; localStorage.setItem("tubescout-theme", dark ? "dark" : "light"); }, [dark]);
 
@@ -327,7 +319,6 @@ export default function Home() {
   }
   function toggleReference(id:string){ setSelectedIds(ids=>ids.includes(id)?ids.filter(x=>x!==id):ids.length>=5?ids:[...ids,id]); setIdeaPack(null); }
   function generateIdea(){ if(!selectedRefs.length){setError("Select 1–5 reference videos first.");setTab("videos");return;} setError(""); setIdeaPack(makeIdeaPack(selectedRefs,similarity,useCase,visualStyle,sceneRule,aspectRatio)); setTab("create"); }
-  async function installApp(){ if(!installPrompt) return; await installPrompt.prompt(); await installPrompt.userChoice; setInstallPrompt(null); }
 
   function exportRows(){return filtered.map((v,i)=>({No:i+1,"Video Title":v.title,"Video URL":v.url,"Video ID":v.id,Channel:v.channelTitle,"Channel ID":v.channelId,Published:v.publishedAt,Duration:v.duration,Views:v.views,"Views / Day":Math.round(viewsPerDay(v)),Likes:v.likes,Comments:v.comments,"Engagement Rate %":Number(engagementRate(v).toFixed(3)),"SEO Title Score":seoAnalysis(v.title).score,Tags:v.tags.join(", "),Description:v.description,CategoryID:v.categoryId,Definition:v.definition,Captions:v.captionsAvailable?"Yes":"No"}));}
   function exportXlsx(){const wb=XLSX.utils.book_new();const ws=XLSX.utils.json_to_sheet(exportRows());ws["!cols"]=[{wch:5},{wch:48},{wch:42},{wch:14},{wch:28},{wch:28},{wch:24},{wch:12},{wch:14},{wch:14},{wch:12},{wch:12},{wch:18},{wch:16},{wch:60},{wch:80},{wch:12},{wch:12},{wch:10}];XLSX.utils.book_append_sheet(wb,ws,"Video Research");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(keywordStats.map((k,i)=>({Rank:i+1,Tag:k.keyword,"Video Count":k.count,"Coverage %":Number(k.videoCoverage.toFixed(1)),Channels:k.channels}))),"Tag Frequency");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(competitors.map((c,i)=>({Rank:i+1,Channel:c.channel,Videos:c.videos,"Total Views":c.totalViews,"Avg Views":Math.round(c.avgViews),"Avg Views Day":Math.round(c.avgViewsDay),"Engagement %":Number(c.avgEngagement.toFixed(3)),"Avg SEO":Math.round(c.avgSeo),"Unique Tags":c.uniqueTags}))),"Competitors");XLSX.writeFile(wb,`tubescout-research-${new Date().toISOString().slice(0,10)}.xlsx`);}
@@ -339,7 +330,7 @@ export default function Home() {
     {showPwaSplash&&<div className="pwaSplash" aria-hidden="true"><img src="/splash-screen.png" alt=""/></div>}
     <header className="topbar">
       <div className="brand"><img src="/tubescout-mark.png" alt="TubeScout"/><div><h1>TubeScout</h1><span>YouTube Competitor Research Tool</span></div></div>
-      <div className="topActions"><span className="versionPill">v1.3</span>{installPrompt&&<button className="installBtn" onClick={installApp}><Smartphone size={16}/> <span>Install App</span></button>}<button className="iconBtn" onClick={()=>setDark(v=>!v)} aria-label="Toggle theme">{dark?<Sun size={18}/>:<Moon size={18}/>}</button></div>
+      <div className="topActions"><span className="versionPill">v1.3.3</span><button className="iconBtn" onClick={()=>setDark(v=>!v)} aria-label="Toggle theme">{dark?<Sun size={18}/>:<Moon size={18}/>}</button></div>
     </header>
 
     <section className="hero">
