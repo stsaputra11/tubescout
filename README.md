@@ -88,7 +88,12 @@ After adding or changing `YOUTUBE_API_KEY`, redeploy the project so the new depl
 - Baby sleep/lullaby/rain references preserve audience, sleep intent, sound theme, title language, visual direction, keywords and hashtags.
 
 
-## v1.3.4 UI revision
+## v1.3.5 UI revision
 - Font scale updated: original 10px → 12px, 8px → 10px, 7px → 9px.
 - CSV export removed; XLSX export retained.
 - Research Workspace inactive tabs use a red gradient with white text, including Create.
+
+
+## v1.3.5
+- Added Visual Style options: 3D Pixar style, Story book art style, 2D cartoon style.
+- Added Regenerate Title to rotate through new hook and semantic phrase variations while preserving the selected reference context.

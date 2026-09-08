@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity, BarChart3, Check, Copy, Download, ExternalLink, Eye, FileSpreadsheet,
   Gauge, Hash, Image as ImageIcon, Layers3, Lightbulb, Moon, Search, Sparkles,
-  Sun, Trash2, TrendingUp, Users, WandSparkles, Youtube, X, FileText
+  Sun, Trash2, TrendingUp, Users, WandSparkles, Youtube, X, FileText, RefreshCw
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -95,7 +95,7 @@ function phraseFromCorpus(corpus: string, candidates: string[], fallback: string
 
 function hasAny(corpus: string, words: string[]) { return words.some(w => corpus.includes(w)); }
 
-function makeIdeaPack(refs: Video[], similarity: Similarity, useCase: string, visualStyle: string, sceneRule: string, aspectRatio: string): IdeaPack {
+function makeIdeaPack(refs: Video[], similarity: Similarity, useCase: string, visualStyle: string, sceneRule: string, aspectRatio: string, titleCycle = 0): IdeaPack {
   const ranked = [...refs].sort((a,b) => viewsPerDay(b) - viewsPerDay(a));
   const corpus = refs.map(v => `${v.title} ${v.description.slice(0,1600)} ${v.tags.join(" ")}`).join(" ");
   const lower = corpus.toLowerCase();
@@ -195,6 +195,104 @@ function makeIdeaPack(refs: Video[], similarity: Similarity, useCase: string, vi
     ]).filter(t => t !== mainTitle).slice(0,5);
   }
 
+  // Regeneration rotates through hook/phrase banks while preserving semantic anchors.
+  const cycle = ((titleCycle % 4) + 4) % 4;
+  if (cycle > 0) {
+    if (isBabySleep) {
+      const packs = [
+        [
+          `Soothing Baby Sleep Music 🌙 | ${titleCase(soundHook)} for Bedtime & Deep Sleep`,
+          `Baby Bedtime Lullaby with ${titleCase(soundHook)} | Gentle Music for Peaceful Sleep`,
+          `Help Your Baby Sleep Peacefully 😴 | Soft Lullaby + ${titleCase(soundHook)}`,
+          `Gentle Sleep Music for Babies 🌙 | Calm Bedtime Sounds + ${titleCase(soundHook)}`,
+          `Peaceful Baby Lullaby | ${titleCase(soundHook)} for Naps, Bedtime & Deep Sleep`,
+          `${titleCase(soundHook)} + Baby Sleep Music | Soft Nighttime Lullaby for Restful Sleep`
+        ],
+        [
+          `Baby Lullaby for Deep Sleep 😴 | Gentle ${titleCase(soundHook)} + Peaceful Bedtime Music`,
+          `Soft Baby Sleep Music with ${titleCase(soundHook)} | Calm Night Routine for Better Sleep`,
+          `Bedtime Music for Babies 🌙 | Gentle Lullaby + ${titleCase(soundHook)}`,
+          `Calm Baby Sleep Sounds | ${titleCase(soundHook)} for a Peaceful Bedtime`,
+          `Gentle Lullaby for Babies 😴 | Soothing Music for Naps & Night Sleep`,
+          `Baby Sleep Music Tonight 🌙 | Soft ${titleCase(soundHook)} for Deep, Peaceful Rest`
+        ],
+        [
+          `Drift Into Sleep, Little One 🌙 | Gentle Baby Lullaby + ${titleCase(soundHook)}`,
+          `Peaceful Bedtime for Babies | Soft Sleep Music with ${titleCase(soundHook)}`,
+          `Gentle Night Lullaby 😴 | Baby Sleep Music + ${titleCase(soundHook)}`,
+          `Baby Sleep Music for a Calm Night | Soothing Lullaby + ${titleCase(soundHook)}`,
+          `Soft Bedtime Lullaby for Babies 🌙 | ${titleCase(soundHook)} & Deep Sleep Music`,
+          `Calm Baby Bedtime Music | Gentle ${titleCase(soundHook)} for Restful Sleep`
+        ]
+      ];
+      const pack = packs[(cycle - 1) % packs.length];
+      mainTitle = safeSentence(pack[0]);
+      alternatives = unique(pack.slice(1).map(safeSentence)).slice(0,5);
+    } else if (isSleepAudio) {
+      const packs = [
+        [
+          `Fall Asleep Faster 😴 | ${titleCase(soundHook)} + Calm Music for Deep Sleep`,
+          `Peaceful Night Sleep Music 🌙 | ${titleCase(soundHook)} for Deep Rest`,
+          `Deep Sleep Sounds with ${titleCase(soundHook)} | Relax & Unwind at Bedtime`,
+          `Calm Sleep Music for Insomnia Relief | Soft ${titleCase(soundHook)}`,
+          `Restful Night Music 😴 | ${titleCase(soundHook)} for Better Sleep`,
+          `Bedtime Sleep Music | Gentle ${titleCase(soundHook)} + Quiet Night Ambience`
+        ],
+        [
+          `Deep Rest Tonight 🌙 | Gentle ${titleCase(soundHook)} for Peaceful Sleep`,
+          `Sleep Music for a Quiet Mind | ${titleCase(soundHook)} + Soft Night Ambience`,
+          `Gentle Night Sounds 😴 | Deep Sleep Music with ${titleCase(soundHook)}`,
+          `Relax Into Deep Sleep | Calm Music + ${titleCase(soundHook)}`,
+          `Peaceful Bedtime Sounds 🌙 | ${titleCase(soundHook)} for Restful Sleep`,
+          `Soft Sleep Music for Insomnia | Gentle ${titleCase(soundHook)} at Night`
+        ],
+        [
+          `Let the Night Slow Down 🌙 | ${titleCase(soundHook)} for Deep Sleep`,
+          `Quiet Sleep Music 😴 | Gentle ${titleCase(soundHook)} for a Restful Night`,
+          `Calm Night Ambience | Deep Sleep Music + ${titleCase(soundHook)}`,
+          `Drift Off Peacefully | Soft ${titleCase(soundHook)} & Bedtime Music`,
+          `Deep Sleep Tonight 🌙 | Calm ${titleCase(soundHook)} for Better Rest`,
+          `Peaceful Sleep Sounds | Gentle ${titleCase(soundHook)} for Nighttime Relaxation`
+        ]
+      ];
+      const pack = packs[(cycle - 1) % packs.length];
+      mainTitle = safeSentence(pack[0]);
+      alternatives = unique(pack.slice(1).map(safeSentence)).slice(0,5);
+    } else {
+      const scenario = titleCase(baseScenario.replace(/\s+/g," "));
+      const intentLabel = intent === "Study & Focus" ? "Study & Focus" : intent;
+      const packs = [
+        [
+          `${scenario} ${nicheTitle} | ${titleCase(mood)} Sounds for ${intentLabel} + ${titleCase(atmosphere)}`,
+          `${titleCase(mood)} ${scenario} | ${nicheTitle} for ${intentLabel}`,
+          `${nicheTitle} in a ${scenario} | Soft Music for ${intentLabel}`,
+          `${scenario} | Gentle ${nicheTitle} + ${titleCase(atmosphere)}`,
+          `${titleCase(mood)} ${nicheTitle} Escape | ${scenario} for ${intentLabel}`,
+          `${scenario} ${nicheTitle} | Slow, ${titleCase(mood)} Music for ${intentLabel}`
+        ],
+        [
+          `${titleCase(mood)} ${nicheTitle} for ${intentLabel} | ${scenario} + ${titleCase(atmosphere)}`,
+          `${scenario} | ${nicheTitle} to ${intentLabel === "Sleep" ? "Wind Down & Sleep" : `Stay ${intentLabel}`}`,
+          `A ${titleCase(mood)} ${scenario} | Soft ${nicheTitle} for ${intentLabel}`,
+          `${nicheTitle} Mood | ${scenario} + ${titleCase(atmosphere)}`,
+          `${scenario} ${nicheTitle} Session | Music for ${intentLabel}`,
+          `Slow ${nicheTitle} | ${scenario} for a ${titleCase(mood)} ${intentLabel} Session`
+        ],
+        [
+          `Step Into a ${titleCase(mood)} ${scenario} | ${nicheTitle} for ${intentLabel}`,
+          `${scenario} ${nicheTitle} | A Soft Soundtrack for ${intentLabel}`,
+          `${titleCase(mood)} Hours in a ${scenario} | ${nicheTitle} + ${titleCase(atmosphere)}`,
+          `${nicheTitle} for ${intentLabel} | A ${scenario} Soundscape`,
+          `${scenario} | ${titleCase(mood)} ${nicheTitle} and Soft Ambience`,
+          `Stay in the Moment | ${scenario} ${nicheTitle} for ${intentLabel}`
+        ]
+      ];
+      const pack = packs[(cycle - 1) % packs.length];
+      mainTitle = safeSentence(pack[0]);
+      alternatives = unique(pack.slice(1).map(safeSentence)).slice(0,5);
+    }
+  }
+
   const referenceCue = similarity === "close"
     ? "keep the same core audience, use case, sound theme and emotional promise as the reference while changing the exact composition, props and wording"
     : similarity === "balanced"
@@ -270,6 +368,7 @@ export default function Home() {
   const [sceneRule, setSceneRule] = useState("no people");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [ideaPack, setIdeaPack] = useState<IdeaPack | null>(null);
+  const [titleCycle, setTitleCycle] = useState(0);
   const [showPwaSplash, setShowPwaSplash] = useState(false);
 
   useEffect(() => {
@@ -314,11 +413,12 @@ export default function Home() {
     if(!inputs.length) return setError("Paste at least one YouTube URL or video ID.");
     if(inputs.length>50) return setError("Maximum 50 video URLs / IDs per batch.");
     setLoading(true);
-    try { const res=await fetch("/api/videos",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({inputs})}); const data=await res.json(); if(!res.ok) throw new Error(data.error||"Unable to extract metadata."); setVideos(data.videos||[]); setSelectedIds([]); setIdeaPack(null); setTab("overview"); const warnings=[]; if(data.invalidInputs?.length)warnings.push(`${data.invalidInputs.length} invalid input(s)`); if(data.unavailableIds?.length)warnings.push(`${data.unavailableIds.length} unavailable/private video(s)`); setNotice(warnings.length?`Loaded ${data.videos.length} video(s). ${warnings.join(" · ")}.`:`Loaded ${data.videos.length} video(s).`); }
+    try { const res=await fetch("/api/videos",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({inputs})}); const data=await res.json(); if(!res.ok) throw new Error(data.error||"Unable to extract metadata."); setVideos(data.videos||[]); setSelectedIds([]); setIdeaPack(null); setTitleCycle(0); setTab("overview"); const warnings=[]; if(data.invalidInputs?.length)warnings.push(`${data.invalidInputs.length} invalid input(s)`); if(data.unavailableIds?.length)warnings.push(`${data.unavailableIds.length} unavailable/private video(s)`); setNotice(warnings.length?`Loaded ${data.videos.length} video(s). ${warnings.join(" · ")}.`:`Loaded ${data.videos.length} video(s).`); }
     catch(e){setError(e instanceof Error?e.message:"Something went wrong.");} finally{setLoading(false);}
   }
-  function toggleReference(id:string){ setSelectedIds(ids=>ids.includes(id)?ids.filter(x=>x!==id):ids.length>=5?ids:[...ids,id]); setIdeaPack(null); }
-  function generateIdea(){ if(!selectedRefs.length){setError("Select 1–5 reference videos first.");setTab("videos");return;} setError(""); setIdeaPack(makeIdeaPack(selectedRefs,similarity,useCase,visualStyle,sceneRule,aspectRatio)); setTab("create"); }
+  function toggleReference(id:string){ setSelectedIds(ids=>ids.includes(id)?ids.filter(x=>x!==id):ids.length>=5?ids:[...ids,id]); setIdeaPack(null); setTitleCycle(0); }
+  function generateIdea(){ if(!selectedRefs.length){setError("Select 1–5 reference videos first.");setTab("videos");return;} setError(""); setTitleCycle(0); setIdeaPack(makeIdeaPack(selectedRefs,similarity,useCase,visualStyle,sceneRule,aspectRatio,0)); setTab("create"); }
+  function regenerateTitle(){ if(!selectedRefs.length||!ideaPack)return; const next=titleCycle+1; const regenerated=makeIdeaPack(selectedRefs,similarity,useCase,visualStyle,sceneRule,aspectRatio,next); setTitleCycle(next); setIdeaPack(prev=>prev?{...prev,mainTitle:regenerated.mainTitle,alternativeTitles:regenerated.alternativeTitles}:regenerated); setNotice("Title variations regenerated from the same semantic reference anchors."); }
 
   function exportRows(){return filtered.map((v,i)=>({No:i+1,"Video Title":v.title,"Video URL":v.url,"Video ID":v.id,Channel:v.channelTitle,"Channel ID":v.channelId,Published:v.publishedAt,Duration:v.duration,Views:v.views,"Views / Day":Math.round(viewsPerDay(v)),Likes:v.likes,Comments:v.comments,"Engagement Rate %":Number(engagementRate(v).toFixed(3)),"SEO Title Score":seoAnalysis(v.title).score,Tags:v.tags.join(", "),Description:v.description,CategoryID:v.categoryId,Definition:v.definition,Captions:v.captionsAvailable?"Yes":"No"}));}
   function exportXlsx(){const wb=XLSX.utils.book_new();const ws=XLSX.utils.json_to_sheet(exportRows());ws["!cols"]=[{wch:5},{wch:48},{wch:42},{wch:14},{wch:28},{wch:28},{wch:24},{wch:12},{wch:14},{wch:14},{wch:12},{wch:12},{wch:18},{wch:16},{wch:60},{wch:80},{wch:12},{wch:12},{wch:10}];XLSX.utils.book_append_sheet(wb,ws,"Video Research");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(keywordStats.map((k,i)=>({Rank:i+1,Tag:k.keyword,"Video Count":k.count,"Coverage %":Number(k.videoCoverage.toFixed(1)),Channels:k.channels}))),"Tag Frequency");XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(competitors.map((c,i)=>({Rank:i+1,Channel:c.channel,Videos:c.videos,"Total Views":c.totalViews,"Avg Views":Math.round(c.avgViews),"Avg Views Day":Math.round(c.avgViewsDay),"Engagement %":Number(c.avgEngagement.toFixed(3)),"Avg SEO":Math.round(c.avgSeo),"Unique Tags":c.uniqueTags}))),"Competitors");XLSX.writeFile(wb,`tubescout-research-${new Date().toISOString().slice(0,10)}.xlsx`);}
@@ -329,7 +429,7 @@ export default function Home() {
     {showPwaSplash&&<div className="pwaSplash" aria-hidden="true"><img src="/splash-screen.png" alt=""/></div>}
     <header className="topbar">
       <div className="brand"><img src="/tubescout-mark.png" alt="TubeScout"/><div><h1>TubeScout</h1><span>YouTube Competitor Research Tool</span></div></div>
-      <div className="topActions"><span className="versionPill">v1.3.3</span><button className="iconBtn" onClick={()=>setDark(v=>!v)} aria-label="Toggle theme">{dark?<Sun size={18}/>:<Moon size={18}/>}</button></div>
+      <div className="topActions"><span className="versionPill">v1.3.5</span><button className="iconBtn" onClick={()=>setDark(v=>!v)} aria-label="Toggle theme">{dark?<Sun size={18}/>:<Moon size={18}/>}</button></div>
     </header>
 
     <section className="hero">
@@ -371,13 +471,13 @@ export default function Home() {
         {tab==="create"&&<div className="tabPanel createWorkspace">
           <section className="createSetup"><div className="sectionHead"><div><h3>Scout to Create</h3><p>Turn 1–5 researched videos into a new original content direction.</p></div><WandSparkles size={19}/></div>
             <div className="referenceChips">{selectedRefs.length?selectedRefs.map(v=><div key={v.id}><img src={v.thumbnail} alt=""/><span>{v.title}</span><button onClick={()=>toggleReference(v.id)}><X size={14}/></button></div>):<div className="noRefs"><Lightbulb size={20}/><span>Select reference videos from the <button onClick={()=>setTab("videos")}>Videos</button> tab first.</span></div>}</div>
-            <div className="formGrid"><label><span>Similarity Level</span><select value={similarity} onChange={e=>setSimilarity(e.target.value as Similarity)}><option value="close">Close — familiar pattern</option><option value="balanced">Balanced — recommended</option><option value="fresh">Fresh — wider reinterpretation</option></select></label><label><span>Use Case</span><select value={useCase} onChange={e=>setUseCase(e.target.value)}><option value="Auto">Auto from reference</option><option>Study</option><option>Work</option><option>Relax</option><option>Focus</option><option>Sleep</option><option>Meditation</option></select></label><label><span>Visual Style</span><select value={visualStyle} onChange={e=>setVisualStyle(e.target.value)}><option>cinematic HD anime style</option><option>Ghibli-inspired anime style</option><option>hyper realistic cinematic photography</option><option>cozy digital illustration</option><option>dark cinematic anime style</option></select></label><label><span>Scene Rule</span><select value={sceneRule} onChange={e=>setSceneRule(e.target.value)}><option value="no people">No people</option><option value="indoor scene, no people">Indoor only</option><option value="outdoor scene, no people">Outdoor only</option><option value="rainy atmosphere, no people">Rainy atmosphere</option><option value="after-rain atmosphere, no people">After rain</option></select></label><label><span>Aspect Ratio</span><select value={aspectRatio} onChange={e=>setAspectRatio(e.target.value)}><option>16:9</option><option>1:1</option><option>9:16</option></select></label></div>
+            <div className="formGrid"><label><span>Similarity Level</span><select value={similarity} onChange={e=>setSimilarity(e.target.value as Similarity)}><option value="close">Close — familiar pattern</option><option value="balanced">Balanced — recommended</option><option value="fresh">Fresh — wider reinterpretation</option></select></label><label><span>Use Case</span><select value={useCase} onChange={e=>setUseCase(e.target.value)}><option value="Auto">Auto from reference</option><option>Study</option><option>Work</option><option>Relax</option><option>Focus</option><option>Sleep</option><option>Meditation</option></select></label><label><span>Visual Style</span><select value={visualStyle} onChange={e=>setVisualStyle(e.target.value)}><option>cinematic HD anime style</option><option>Ghibli-inspired anime style</option><option>3D Pixar style</option><option>Story book art style</option><option>2D cartoon style</option><option>hyper realistic cinematic photography</option><option>cozy digital illustration</option><option>dark cinematic anime style</option></select></label><label><span>Scene Rule</span><select value={sceneRule} onChange={e=>setSceneRule(e.target.value)}><option value="no people">No people</option><option value="indoor scene, no people">Indoor only</option><option value="outdoor scene, no people">Outdoor only</option><option value="rainy atmosphere, no people">Rainy atmosphere</option><option value="after-rain atmosphere, no people">After rain</option></select></label><label><span>Aspect Ratio</span><select value={aspectRatio} onChange={e=>setAspectRatio(e.target.value)}><option>16:9</option><option>1:1</option><option>9:16</option></select></label></div>
             <button className="primary wideGenerate" onClick={generateIdea} disabled={!selectedRefs.length}><WandSparkles size={18}/> Generate Idea Pack</button>
             <div className="originalityNote"><Sparkles size={16}/><p>TubeScout extracts patterns, not copies. The generated direction intentionally changes composition, props and visual storytelling to help you create a distinct new video.</p></div>
           </section>
 
           {ideaPack?<section className="ideaResults"><div className="ideaHeader"><div><span>GENERATED IDEA PACK</span><h2>Ready for production</h2><p>{ideaPack.conceptSummary}</p></div><button onClick={exportIdeaPack}><Download size={16}/> Export Idea Pack</button></div>
-            <div className="ideaBlock titleBlock"><div className="ideaBlockHead"><div><Sparkles size={18}/><h3>Title Ideas</h3></div><button onClick={()=>copyText([ideaPack.mainTitle,...ideaPack.alternativeTitles].join("\n"))}><Copy size={15}/> Copy Titles</button></div><div className="mainIdeaTitle"><span>MAIN TITLE · SEO {seoAnalysis(ideaPack.mainTitle).score}/100</span><strong>{ideaPack.mainTitle}</strong></div><div className="altTitles">{ideaPack.alternativeTitles.map((t,i)=><div key={t}><span>0{i+1}</span><p>{t}</p><button onClick={()=>copyText(t)}><Copy size={14}/></button></div>)}</div></div>
+            <div className="ideaBlock titleBlock"><div className="ideaBlockHead"><div><Sparkles size={18}/><h3>Title Ideas</h3></div><div className="ideaHeadActions"><button onClick={regenerateTitle}><RefreshCw size={15}/> Regenerate Title</button><button onClick={()=>copyText([ideaPack.mainTitle,...ideaPack.alternativeTitles].join("\n"))}><Copy size={15}/> Copy Titles</button></div></div><div className="mainIdeaTitle"><span>MAIN TITLE · SEO {seoAnalysis(ideaPack.mainTitle).score}/100</span><strong>{ideaPack.mainTitle}</strong></div><div className="altTitles">{ideaPack.alternativeTitles.map((t,i)=><div key={t}><span>0{i+1}</span><p>{t}</p><button onClick={()=>copyText(t)}><Copy size={14}/></button></div>)}</div></div>
             <div className="ideaBlock"><div className="ideaBlockHead"><div><ImageIcon size={18}/><h3>Visual Prompts</h3></div><button onClick={()=>copyText(ideaPack.visualPrompts.map(p=>`${p.label}\n${p.prompt}`).join("\n\n"))}><Copy size={15}/> Copy Prompts</button></div><div className="promptGrid">{ideaPack.visualPrompts.map(p=><article key={p.label}><span>{p.label}</span><p>{p.prompt}</p><button onClick={()=>copyText(p.prompt)}><Copy size={14}/> Copy</button></article>)}</div></div>
             <div className="ideaBlock"><div className="ideaBlockHead"><div><FileText size={18}/><h3>Video Description</h3></div><button onClick={()=>copyText(ideaPack.longDescription)}><Copy size={15}/> Copy Full</button></div><div className="descriptionGrid"><article><span>SHORT HOOK</span><p>{ideaPack.shortDescription}</p></article><article><span>FULL SEO DESCRIPTION</span><p>{ideaPack.longDescription}</p></article></div></div>
             <div className="ideaSplit"><div className="ideaBlock"><div className="ideaBlockHead"><div><Hash size={18}/><h3>Meta Tag Keywords</h3></div><button onClick={()=>copyText(ideaPack.metaKeywords.join(", "))}><Copy size={15}/> Copy</button></div><div className="keywordCloud">{ideaPack.metaKeywords.map(k=><span key={k}>{k}</span>)}</div></div><div className="ideaBlock"><div className="ideaBlockHead"><div><Hash size={18}/><h3>Hashtags</h3></div><button onClick={()=>copyText(ideaPack.hashtags.join(" "))}><Copy size={15}/> Copy</button></div><div className="keywordCloud hashtags">{ideaPack.hashtags.map(k=><span key={k}>{k}</span>)}</div></div></div>
