@@ -86,3 +86,9 @@ After adding or changing `YOUTUBE_API_KEY`, redeploy the project so the new depl
 - Success alerts use green; errors/warnings use amber.
 - Scout to Create uses semantic anchors and Auto from reference intent detection.
 - Baby sleep/lullaby/rain references preserve audience, sleep intent, sound theme, title language, visual direction, keywords and hashtags.
+
+
+## v1.3.4 UI revision
+- Font scale updated: original 10px → 12px, 8px → 10px, 7px → 9px.
+- CSV export removed; XLSX export retained.
+- Research Workspace inactive tabs use a red gradient with white text, including Create.
